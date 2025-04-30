@@ -1,259 +1,246 @@
 import * as qrcode from 'qrcode-terminal';
-import { Client, LocalAuth } from 'whatsapp-web.js';
-import { config } from './config';
-import {
-  DAILY_LIMIT,
-  filterRegisteredNumbers,
-  HOURLY_LIMIT,
-  loadContactsFromCSV,
-  newTonMessage
-} from './contacts';
-import { delay } from './delay';
-import { formatPhoneNumber } from './format-phone-number';
-import { maskPhoneNumber } from './mask-phone-number';
-import { initializeSentNumbers, registerSentNumber } from './sentNumbers';
-import { initializeUnregisteredNumbers } from './unregisteredNumbers';
+import { client } from './config/whatsapp';
+import { PhoneNumberRepository } from './database/PhoneNumberRepository';
+import env from './env';
+import { loadContactsFromCSV } from './load-contacts-from-csv';
+import { newTonMessage } from './messages';
+import { delay, formatPhoneNumber, getRandomInterval, maskPhoneNumber } from './utils';
+import { Logger } from './utils/logger';
 
-let contacts: string[] = [];
 let hourlyMessagesSent = 0;
 let dailyMessagesSent = 0;
 let lastHourReset = Date.now();
 let lastDayReset = Date.now();
 
-// WhatsApp client configuration
-const client = new Client({
-  authStrategy: new LocalAuth({
-    dataPath: `./sessions/${config.whatsapp.sessionName}`,
-    clientId: 'client-one'
-  }),
-  puppeteer: {
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-      '--disable-extensions',
-      '--disable-software-rasterizer',
-      '--disable-features=site-per-process',
-      '--disable-web-security'
-    ],
-    executablePath: '/usr/bin/google-chrome',
-    defaultViewport: null,
-    handleSIGINT: true,
-    handleSIGTERM: true,
-    handleSIGHUP: true
-  },
-  qrMaxRetries: 5,
-  takeoverOnConflict: true,
-  takeoverTimeoutMs: 10000,
-  restartOnAuthFail: true
-});
+const LIMITS_DAILY = env.limits.daily;
+const LIMITS_HOURLY = env.limits.hourly;
+
+const phoneNumberRepository = new PhoneNumberRepository();
+phoneNumberRepository.initialize();
 
 // Generate QR Code for authentication
 client.on('qr', (qr) => {
   qrcode.generate(qr, { small: true });
-  console.log('📱 Escaneie o QR Code acima para conectar ao WhatsApp Web');
+  Logger.info('Escaneie o QR Code acima para conectar ao WhatsApp Web');
 });
 
 // Add error handler for Puppeteer errors
 client.on('disconnected', async (reason) => {
-  console.log('🔌 Cliente desconectado:', reason);
+  Logger.error('Cliente desconectado', String(reason));
   try {
     await client.destroy();
-    console.log('🔄 Reiniciando cliente...');
+    Logger.info('Reiniciando cliente...');
     client.initialize();
   } catch (error) {
-    console.error('❌ Erro ao reiniciar cliente:', error);
+    Logger.error('Erro ao reiniciar cliente', error instanceof Error ? error : String(error));
     process.exit(1);
   }
 });
 
 // Add connection state handler
 client.on('change_state', state => {
-  console.log('📡 Estado alterado:', state);
+  Logger.info(`Estado alterado: ${state}`);
 });
 
 // Add authentication state handler
 client.on('authenticated', () => {
-  console.log('🔐 Cliente autenticado com sucesso!');
+  Logger.success('Cliente autenticado com sucesso!');
 });
 
 // Add ready state handler with retry logic
 client.on('ready', async () => {
-  console.log('✅ WhatsApp conectado com sucesso!');
+  Logger.success('WhatsApp conectado com sucesso!');
   
   try {
-    console.log('\n################################################################');
-    console.log('#                     INICIANDO NOVO PROCESSO                     #');
-    console.log('################################################################\n');
-
-    // Initialize sent numbers tracking system
-    initializeSentNumbers();
-    initializeUnregisteredNumbers();
+    Logger.section('INICIANDO NOVO PROCESSO');
 
     // Load contacts from CSV
     let allContacts = await loadContactsFromCSV();
     
     if (allContacts.length === 0) {
-      console.log('❌ Nenhum número válido para envio.');
+      Logger.error('Nenhum número válido para envio.');
       process.exit(0);
     }
 
-    // Filtra apenas números registrados no WhatsApp
-    contacts = await filterRegisteredNumbers(allContacts, client);
+    for (const number of allContacts) {
+      // Registra o número como pendente
+      await phoneNumberRepository.addOrUpdatePhone(number, 'imported-contacts');
 
-    if (contacts.length === 0) {
-      console.log('❌ Nenhum número registrado no WhatsApp para envio.');
+      // Verifica no WhatsApp
+      const isRegistered = await client.isRegisteredUser(`${number}@c.us`);
+
+      // Atualiza o status do número
+      await phoneNumberRepository.updateWhatsAppStatus(number, isRegistered);
+
+      if (isRegistered) {
+        Logger.success(`${maskPhoneNumber(formatPhoneNumber(number))}`);
+      } else {
+        Logger.error(`${maskPhoneNumber(formatPhoneNumber(number))}`);
+      }
+    }
+
+    // Agora podemos começar o envio
+    const numbersToProcess = (await phoneNumberRepository.getPendingRegisteredNumbers())
+      .map(phone => phone.phone_number);
+  
+    if (numbersToProcess.length > 0) {
+      Logger.info(`\nIniciando envio para ${numbersToProcess.length} números...`);
+    } else {
+      const stats = await phoneNumberRepository.getStats();
+      Logger.summary('Estatísticas', stats);
+      Logger.error('Nenhum número registrado no WhatsApp e pendente de envio encontrado no banco de dados.');
       process.exit(0);
     }
 
-    console.log('\n🚀 Preparando envio de mensagens...');
-    console.log(`├─ 📱 Total de números válidos: ${contacts.length}`);
-    console.log(`├─ ⏱️  Limite por hora: ${HOURLY_LIMIT}`);
-    console.log(`└─ ⌛ Intervalo entre envios: 1-30s (aleatório)`);
+    Logger.section('PREPARANDO ENVIO DE MENSAGENS');
+    Logger.status(`Total de números válidos: ${numbersToProcess.length}`);
+    Logger.status(`Limite por hora: ${LIMITS_HOURLY}`);
+    Logger.status(`Intervalo entre envios: 1-30s (aleatório)`);
     
-    console.log('\n⏳ Aguardando 5 segundos antes de iniciar...');
+    Logger.wait('Aguardando 5 segundos antes de iniciar...');
     await delay(5000);
-    await sendBulkMessages();
+    await sendBulkMessages(numbersToProcess);
   } catch (error) {
-    console.error('❌ Erro ao carregar contatos:', error);
+    Logger.error('Erro ao carregar contatos', error instanceof Error ? error : String(error));
     process.exit(1);
   }
 });
 
 // Function to send bulk messages
-async function sendBulkMessages() {
-  console.log('\n################################################################');
-  console.log('#                     INICIANDO ENVIO EM MASSA                    #');
-  console.log('################################################################\n');
+async function sendBulkMessages(numbersToProcess: string[]) {
+  Logger.section('INICIANDO ENVIO EM MASSA');
   
-  console.log('📊 Resumo da Configuração:');
-  console.log(`├─ 📱 Total de contatos: ${contacts.length}`);
-  console.log(`├─ ⏱️  Limite por hora: ${HOURLY_LIMIT} mensagens`);
-  console.log(`├─ 📅 Limite diário: ${DAILY_LIMIT} mensagens`);
-  console.log(`├─ ⌛ Intervalo entre envios: 1-30s (aleatório)`);
-  console.log(`└─ 🔄 Pausa a cada 50 mensagens: 1 minuto\n`);
+  Logger.summary('Resumo da Configuração', {
+    'Total de contatos': numbersToProcess.length,
+    'Limite por hora': LIMITS_HOURLY,
+    'Limite diário': LIMITS_DAILY,
+    'Intervalo entre envios': '1-30s (aleatório)',
+    'Pausa a cada 50 mensagens': '1 minuto'
+  });
   
-  for (const [index, number] of contacts.entries()) {
+  for (const [index, number] of numbersToProcess.entries()) {
     try {
       const currentBatch = Math.floor(index / 50) + 1;
-      const totalBatches = Math.ceil(contacts.length / 50);
+      const totalBatches = Math.ceil(numbersToProcess.length / 50);
 
       // Pausa a cada 50 mensagens
       if (index > 0 && index % 50 === 0) {
-        console.log('\n################################################################');
-        console.log(`#                PAUSA PROGRAMADA - LOTE ${currentBatch-1} FINALIZADO              #`);
-        console.log('################################################################\n');
-        console.log('📊 Status do Envio:');
-        console.log(`├─ ✉️  Mensagens enviadas: ${index}/${contacts.length}`);
-        console.log(`├─ 📊 Progresso: ${((index/contacts.length)*100).toFixed(1)}%`);
-        console.log(`├─ 🔄 Lotes processados: ${currentBatch-1}/${totalBatches}`);
-        console.log(`└─ ⏳ Iniciando pausa de 1 minuto...\n`);
-        await delay(60000); // 1 minuto
-        console.log('✅ Pausa finalizada, retomando envios...\n');
+        Logger.section(`PAUSA PROGRAMADA - LOTE ${currentBatch-1} FINALIZADO`);
+        
+        Logger.summary('Status do Envio', {
+          'Mensagens enviadas': `${index}/${numbersToProcess.length}`,
+          'Progresso': `${((index/numbersToProcess.length)*100).toFixed(1)}%`,
+          'Lotes processados': `${currentBatch-1}/${totalBatches}`
+        });
+        
+        Logger.wait('Iniciando pausa de 1 minuto...');
+        await delay(60000);
+        Logger.success('Pausa finalizada, retomando envios...');
       }
 
-      console.log("#".repeat(100));
-      console.log(`📬 PROCESSANDO MENSAGEM ${index + 1}/${contacts.length}`);
-      console.log(`├─ 📱 Número: ${maskPhoneNumber(formatPhoneNumber(number))}`);
-      console.log(`├─ 📊 Lote atual: ${currentBatch}/${totalBatches}`);
-      console.log(`└─ 🔄 Progresso geral: ${((index/contacts.length)*100).toFixed(1)}%`);
-      console.log("#".repeat(100));
+      Logger.separator();
+      Logger.status(`PROCESSANDO MENSAGEM ${index + 1}/${numbersToProcess.length}`);
+      Logger.progress(index + 1, numbersToProcess.length, 'Progresso');
+      Logger.info(`Número: ${maskPhoneNumber(formatPhoneNumber(number))}`);
+      Logger.info(`Lote atual: ${currentBatch}/${totalBatches}`);
 
       // Check daily limit
       const now = Date.now();
       if (now - lastDayReset >= 86400000) {
         dailyMessagesSent = 0;
         lastDayReset = now;
-        console.log('\n🔄 REINICIANDO CONTADOR DIÁRIO');
-        console.log(`└─ ✨ Novo período iniciado: ${new Date().toLocaleString()}\n`);
+        Logger.info('REINICIANDO CONTADOR DIÁRIO');
+        Logger.info(`Novo período iniciado: ${new Date().toLocaleString()}`);
       }
 
-      if (dailyMessagesSent >= DAILY_LIMIT) {
-        console.log('\n⚠️  LIMITE DIÁRIO ATINGIDO');
-        console.log(`├─ 📊 Mensagens enviadas hoje: ${dailyMessagesSent}`);
-        console.log(`├─ ⏱️  Limite diário: ${DAILY_LIMIT}`);
-        console.log('└─ 🔄 Aguardando próximo período...\n');
+      if (dailyMessagesSent >= LIMITS_DAILY) {
+        Logger.warning('LIMITE DIÁRIO ATINGIDO');
+        Logger.summary('Status', {
+          'Mensagens enviadas hoje': dailyMessagesSent,
+          'Limite diário': LIMITS_DAILY
+        });
+        Logger.wait('Aguardando próximo período...');
         await delay(86400000 - (now - lastDayReset));
         dailyMessagesSent = 0;
         lastDayReset = Date.now();
-        console.log('✅ Novo período diário iniciado!\n');
+        Logger.success('Novo período diário iniciado!');
       }
 
       // Check hourly limit
       if (now - lastHourReset >= 3600000) {
         hourlyMessagesSent = 0;
         lastHourReset = now;
-        console.log('\n🔄 REINICIANDO CONTADOR HORÁRIO');
-        console.log(`└─ ✨ Nova hora iniciada: ${new Date().toLocaleString()}\n`);
+        Logger.info('REINICIANDO CONTADOR HORÁRIO');
+        Logger.info(`Nova hora iniciada: ${new Date().toLocaleString()}`);
       }
 
-      if (hourlyMessagesSent >= HOURLY_LIMIT) {
-        console.log('\n⚠️  LIMITE HORÁRIO ATINGIDO');
-        console.log(`├─ 📊 Mensagens enviadas na hora: ${hourlyMessagesSent}`);
-        console.log(`├─ ⏱️  Limite por hora: ${HOURLY_LIMIT}`);
-        console.log('└─ 🔄 Aguardando próxima hora...\n');
+      if (hourlyMessagesSent >= LIMITS_HOURLY) {
+        Logger.warning('LIMITE HORÁRIO ATINGIDO');
+        Logger.summary('Status', {
+          'Mensagens enviadas na hora': hourlyMessagesSent,
+          'Limite por hora': LIMITS_HOURLY
+        });
+        Logger.wait('Aguardando próxima hora...');
         await delay(3600000 - (now - lastHourReset));
         hourlyMessagesSent = 0;
         lastHourReset = Date.now();
-        console.log('✅ Nova hora iniciada!\n');
+        Logger.success('Nova hora iniciada!');
       }
 
       // Send message
-      process.stdout.write(`📤 Enviando mensagem... `);
+      Logger.sameLine('📤 Enviando mensagem... ');
       await client.sendMessage(`${number}@c.us`, newTonMessage);
-      console.log('✅');
+      Logger.success('Mensagem enviada com sucesso!');
       
-      // Register the sent number
-      registerSentNumber(number);
+      // Marca o número como enviado no banco
+      await phoneNumberRepository.markMessageAsSent(number, 'whatsapp-campaign');
       
       hourlyMessagesSent++;
       dailyMessagesSent++;
 
       // Status após envio
-      console.log('\n📊 Status do Envio:');
-      console.log(`├─ ⏱️  Mensagens na última hora: ${hourlyMessagesSent}/${HOURLY_LIMIT}`);
-      console.log(`└─ 📅 Mensagens hoje: ${dailyMessagesSent}/${DAILY_LIMIT}\n`);
-      
-      console.log("#".repeat(100));
+      Logger.summary('Status do Envio', {
+        'Mensagens na última hora': `${hourlyMessagesSent}/${LIMITS_HOURLY}`,
+        'Mensagens hoje': `${dailyMessagesSent}/${LIMITS_DAILY}`
+      });
       
       // Wait interval before next contact
-      if (index < contacts.length - 1) {
-        // const interval = SENDING_INTERVAL();
-        const interval = 1000;
-        console.log(`⏳ Aguardando ${interval/1000}s antes do próximo envio...`);
+      if (index < numbersToProcess.length - 1) {
+        const interval = getRandomInterval();
+        Logger.wait(`Aguardando ${interval/1000}s antes do próximo envio...`);
         await delay(interval);
       }
       
     } catch (error) {
-      console.log('\n❌ ERRO NO ENVIO');
-      console.log(`├─ 📱 Número: ${maskPhoneNumber(formatPhoneNumber(number))}`);
-      console.log(`└─ ❌ Erro: ${error instanceof Error ? error.message : error}\n`);
+      Logger.error('ERRO NO ENVIO');
+      Logger.error(`Número: ${maskPhoneNumber(formatPhoneNumber(number))}`);
+      Logger.error('Detalhes do erro', error instanceof Error ? error : String(error));
       
-      if (index < contacts.length - 1) {
-        console.log('⏳ Aguardando 30 segundos antes de tentar o próximo número...\n');
+      // Marca o erro no banco
+      await phoneNumberRepository.markMessageAsFailed(number, error instanceof Error ? error.message : String(error));
+      
+      if (index < numbersToProcess.length - 1) {
+        Logger.wait('Aguardando 30 segundos antes de tentar o próximo número...');
         await delay(30000);
       }
     }
   }
   
-  console.log('\n################################################################');
-  console.log('#                    PROCESSO FINALIZADO                         #');
-  console.log('################################################################\n');
+  Logger.section('PROCESSO FINALIZADO');
   
-  console.log('📊 Resumo Final:');
-  console.log(`├─ ✅ Total de mensagens processadas: ${contacts.length}`);
-  console.log(`├─ 📅 Data de conclusão: ${new Date().toLocaleString()}`);
-  console.log(`└─ ✨ Processo finalizado com sucesso!\n`);
+  Logger.summary('Resumo Final', {
+    'Total de mensagens processadas': numbersToProcess.length,
+    'Data de conclusão': new Date().toLocaleString(),
+    'Status': 'Processo finalizado com sucesso!'
+  });
+
+  await phoneNumberRepository.getStats();
+  
+  // Fecha a conexão com o banco
+  await phoneNumberRepository.close();
   
   process.exit(0);
 }
-
-
 
 // Initialize client
 client.initialize();
