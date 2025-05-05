@@ -35,11 +35,36 @@ const env = {
    */
   limits: {
     /** Limite diário de mensagens */
-    daily: parseInt(process.env.DAILY_LIMIT || '1500'),
+    daily: parseInt(process.env.DAILY_LIMIT || '1200'),
     /** Limite por hora de mensagens */
-    hourly: parseInt(process.env.HOURLY_LIMIT || '100'),
+    hourly: parseInt(process.env.HOURLY_LIMIT || '60'),
     /** Intervalo entre mensagens (em ms) */
-    messageInterval: parseInt(process.env.MESSAGE_INTERVAL_MS || '5000'),
+    messageInterval: parseInt(process.env.MESSAGE_INTERVAL_MS || '60000'), // 1 minuto
+
+    /**
+     * Limite de mensagens por lote
+     */
+    batchSize: parseInt(process.env.BATCH_SIZE || '50'),
+
+    /**
+     * Intervalo de pausa entre lotes (em ms)
+     */
+    pauseDuration: parseInt(process.env.PAUSE_DURATION || '60000'),
+
+    /**
+     * Intervalo de pausa entre lotes (em ms)
+     */ 
+    errorRetryDelay: parseInt(process.env.ERROR_RETRY_DELAY || '30000'),
+
+    /**
+     * Intervalo mínimo de pausa entre envios (em segundos)
+     */
+    minSeconds: parseInt(process.env.MIN_SECONDS || '15'),
+
+    /**
+     * Intervalo máximo de pausa entre envios (em segundos)
+     */
+    maxSeconds: parseInt(process.env.MAX_SECONDS || '30'),
   },
 
   /**

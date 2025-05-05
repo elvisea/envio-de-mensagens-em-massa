@@ -1,17 +1,8 @@
 import { Database as SQLiteDB } from 'sqlite';
 import { Database as SQLiteDatabase } from 'sqlite3';
-import { Database } from './Database';
 
-interface PhoneNumber {
-  phone_number: string;
-  status: 'pending' | 'sent' | 'failed';
-  is_whatsapp_registered: boolean;
-  sent_at?: Date;
-  error_message?: string;
-  retry_count: number;
-  campaign?: string;
-  csv_filename: string;
-}
+import { BulkPhoneInsert, PhoneNumber, WhatsAppStatus } from '../interfaces';
+import { Database } from './Database';
 
 export class PhoneNumberRepository {
   private db!: SQLiteDB<SQLiteDatabase>;
@@ -42,6 +33,41 @@ export class PhoneNumberRepository {
   }
 
   /**
+   * Adiciona ou atualiza múltiplos números de telefone no banco em uma única transação
+   */
+  async addOrUpdatePhonesBulk(phones: BulkPhoneInsert[]) {
+    const now = new Date().toISOString();
+    
+    try {
+      await this.db.run('BEGIN TRANSACTION');
+      
+      const stmt = await this.db.prepare(`
+        INSERT INTO phone_numbers (
+          phone_number, 
+          status,
+          csv_filename, 
+          first_seen_at, 
+          last_updated_at
+        ) VALUES (?, 'pending', ?, ?, ?)
+        ON CONFLICT(phone_number) DO UPDATE SET
+          last_updated_at = ?,
+          csv_filename = ?
+      `);
+
+      for (const { phoneNumber, csvFilename } of phones) {
+        await stmt.run([phoneNumber, csvFilename, now, now, now, csvFilename]);
+      }
+
+      await stmt.finalize();
+      await this.db.run('COMMIT');
+      
+    } catch (error) {
+      await this.db.run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  /**
    * Atualiza o status de registro no WhatsApp de um número
    */
   async updateWhatsAppStatus(phoneNumber: string, isRegistered: boolean) {
@@ -52,6 +78,33 @@ export class PhoneNumberRepository {
        WHERE phone_number = ?`,
       [isRegistered, phoneNumber]
     );
+  }
+
+  /**
+   * Atualiza o status de registro no WhatsApp de múltiplos números em uma única transação
+   */
+  async updateWhatsAppStatusBulk(statuses: WhatsAppStatus[]) {
+    try {
+      await this.db.run('BEGIN TRANSACTION');
+      
+      const stmt = await this.db.prepare(`
+        UPDATE phone_numbers 
+        SET is_whatsapp_registered = ?,
+            last_updated_at = CURRENT_TIMESTAMP
+        WHERE phone_number = ?
+      `);
+
+      for (const { phoneNumber, isRegistered } of statuses) {
+        await stmt.run([isRegistered, phoneNumber]);
+      }
+
+      await stmt.finalize();
+      await this.db.run('COMMIT');
+      
+    } catch (error) {
+      await this.db.run('ROLLBACK');
+      throw error;
+    }
   }
 
   /**

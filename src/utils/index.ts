@@ -1,3 +1,5 @@
+import env from '../env';
+
 /**
  * Format a phone number for display (55DD9XXXXXXXX -> (DD) XXXX-XXXX or (DD) XXXXX-XXXX)
  */
@@ -21,12 +23,12 @@ export function delay(ms: number): Promise<void> {
 }
 
 /**
- * Gera um intervalo aleatório entre 1 e 30 segundos (1000-30000ms)
+ * Gera um intervalo aleatório entre 15 e 30 segundos (15000-30000ms)
  * para tornar o envio de mensagens mais natural e menos detectável
  */
 export function getRandomInterval(): number {
-  const minSeconds = 1;
-  const maxSeconds = 30;
+  const minSeconds = env.limits.minSeconds;
+  const maxSeconds = env.limits.maxSeconds;
   const randomSeconds = Math.floor(Math.random() * (maxSeconds - minSeconds + 1)) + minSeconds;
   return randomSeconds * 1000; // Convertendo para milissegundos
 }

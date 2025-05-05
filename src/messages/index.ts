@@ -92,3 +92,16 @@ Se preferir, também estou à disposição para te ajudar no que precisar! 💬
 ⚠️ Promoção válida por tempo limitado. Qualquer dúvida é só me chamar!
 
 Caso não queira receber mensagens, é só me avisar. 😉`
+
+
+export const newMessage = `Olá, tudo bem? 😊
+Me chamo Ana Luiza e sou consultora oficial da Ton. Vi que sua empresa foi criada recentemente e acredito que posso te ajudar a vender com mais facilidade e economia.
+
+Trabalho com maquininhas com:
+✅ Taxas a partir de 0,74%
+✅ Zero mensalidade — a maquininha é sua
+✅ Recebimento rápido, em até 1 dia útil
+✅ Suporte confiável e dedicado
+
+Se quiser saber mais, estou por aqui para te ajudar no que precisar! 💬
+Caso não queira receber mensagens, é só me avisar, tudo bem?`

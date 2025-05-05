@@ -29,6 +29,9 @@ data/*.db-journal
 data/sent-numbers.json
 data/unregistered-numbers.json
 
+# old files
+data/old_files
+
 # Logs
 logs/
 *.log
