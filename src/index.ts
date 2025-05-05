@@ -2,10 +2,9 @@ import * as qrcode from 'qrcode-terminal';
 import { client } from './config/whatsapp';
 import { counters, LIMITS } from './constants';
 import { PhoneNumberRepository } from './database/PhoneNumberRepository';
-import env from './env';
 import { loadContactsFromCSV } from './load-contacts-from-csv';
-import { newMessage } from './messages';
-import { delay, formatPhoneNumber, maskPhoneNumber } from './utils';
+import { messageVariants } from './messages';
+import { delay, formatPhoneNumber, getRandomInterval, maskPhoneNumber } from './utils';
 import { Logger } from './utils/logger';
 
 // Inicialização do repositório
@@ -107,7 +106,8 @@ async function processBatch(numbers: string[], startIndex: number, batchNumber: 
       await handleMessageLimits();
       
       Logger.sameLine('📤 Enviando mensagem... ');
-      await client.sendMessage(`${number}@c.us`, newMessage);
+      const randomMessage = messageVariants[Math.floor(Math.random() * messageVariants.length)];
+      await client.sendMessage(`${number}@c.us`, randomMessage);
       Logger.success('Mensagem enviada com sucesso!');
       
       await phoneNumberRepository.markMessageAsSent(number, 'whatsapp-campaign');
@@ -121,9 +121,10 @@ async function processBatch(numbers: string[], startIndex: number, batchNumber: 
       });
 
       if (index < batch.length - 1) {
-        const interval = env.limits.messageInterval;
-        Logger.wait(`Aguardando ${interval/1000}s antes do próximo envio...`);
-        await delay(interval);
+        // const interval = env.limits.messageInterval;
+        const randomInterval = getRandomInterval();
+        Logger.wait(`Aguardando ${randomInterval/1000}s antes do próximo envio...`);
+        await delay(randomInterval);
       }
     } catch (error) {
       Logger.error('ERRO NO ENVIO');

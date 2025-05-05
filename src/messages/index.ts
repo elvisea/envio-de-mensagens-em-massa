@@ -93,7 +93,6 @@ Se preferir, também estou à disposição para te ajudar no que precisar! 💬
 
 Caso não queira receber mensagens, é só me avisar. 😉`
 
-
 export const newMessage = `Olá, tudo bem? 😊
 Me chamo Ana Luiza e sou consultora oficial da Ton. Vi que sua empresa foi criada recentemente e acredito que posso te ajudar a vender com mais facilidade e economia.
 
@@ -105,3 +104,46 @@ Trabalho com maquininhas com:
 
 Se quiser saber mais, estou por aqui para te ajudar no que precisar! 💬
 Caso não queira receber mensagens, é só me avisar, tudo bem?`
+
+export const newMessageVariant1 = `Oi, tudo certo? 😊
+Sou Ana Luiza, consultora oficial da Ton. Notei que sua empresa foi criada recentemente e acredito que posso ajudar você a vender de forma mais simples e econômica.
+
+Ofereço maquininhas com:
+✅ Taxas a partir de 0,74%
+✅ Sem mensalidade — a maquininha é sua
+✅ Recebimento em até 1 dia útil
+✅ Suporte dedicado e confiável
+
+Se quiser saber mais, estou à disposição para tirar dúvidas! 💬
+Se preferir não receber mensagens, é só avisar, combinado?`
+
+export const newMessageVariant2 = `Olá! 👋 Me chamo Ana Luiza e sou consultora da Ton.
+Vi que você abriu sua empresa recentemente e gostaria de apresentar uma solução para facilitar suas vendas e economizar no dia a dia.
+
+Nossas maquininhas oferecem:
+✅ Taxas reduzidas a partir de 0,74%
+✅ Zero mensalidade — a máquina é sua
+✅ Pagamento rápido, em até 1 dia útil
+✅ Atendimento ágil e confiável
+
+Se quiser conversar, estou aqui para ajudar! 💬
+Caso não queira receber mais mensagens, é só me avisar. 😉`
+
+export const newMessageVariant3 = `Oi, tudo bem? 😊
+Aqui é a Ana Luiza, consultora oficial da Ton. Percebi que sua empresa foi criada há pouco tempo e quero te mostrar como é fácil vender com nossas maquininhas.
+
+Veja as vantagens:
+✅ Taxas a partir de 0,74%
+✅ Sem mensalidade — a maquininha é sua
+✅ Receba em até 1 dia útil
+✅ Suporte sempre disponível
+
+Se tiver interesse, posso explicar melhor! 💬
+Se não quiser receber mensagens, só avisar, ok?`
+
+export const messageVariants = [
+  newMessage,
+  newMessageVariant1,
+  newMessageVariant2,
+  newMessageVariant3,
+];
