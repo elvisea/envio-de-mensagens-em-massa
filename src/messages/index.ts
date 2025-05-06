@@ -102,7 +102,8 @@ Trabalho com maquininhas com:
 ✅ Recebimento rápido, em até 1 dia útil
 ✅ Suporte confiável e dedicado
 
-Se quiser saber mais, estou por aqui para te ajudar no que precisar! 💬
+Todas as informações completas estão disponíveis no site oficial da Ton: https://bit.ly/3Ygot8q.
+Se preferir, também estou à disposição para te ajudar no que precisar! 💬
 Caso não queira receber mensagens, é só me avisar, tudo bem?`
 
 export const newMessageVariant1 = `Oi, tudo certo? 😊
@@ -114,7 +115,8 @@ Ofereço maquininhas com:
 ✅ Recebimento em até 1 dia útil
 ✅ Suporte dedicado e confiável
 
-Se quiser saber mais, estou à disposição para tirar dúvidas! 💬
+Para mais detalhes, acesse o site oficial da Ton: https://bit.ly/3Ygot8q.
+Qualquer dúvida, é só me chamar por aqui! 💬
 Se preferir não receber mensagens, é só avisar, combinado?`
 
 export const newMessageVariant2 = `Olá! 👋 Me chamo Ana Luiza e sou consultora da Ton.
@@ -126,7 +128,8 @@ Nossas maquininhas oferecem:
 ✅ Pagamento rápido, em até 1 dia útil
 ✅ Atendimento ágil e confiável
 
-Se quiser conversar, estou aqui para ajudar! 💬
+Confira todas as condições e informações no site oficial da Ton: https://bit.ly/3Ygot8q.
+Se precisar de ajuda, estou à disposição! 💬
 Caso não queira receber mais mensagens, é só me avisar. 😉`
 
 export const newMessageVariant3 = `Oi, tudo bem? 😊
@@ -138,7 +141,8 @@ Veja as vantagens:
 ✅ Receba em até 1 dia útil
 ✅ Suporte sempre disponível
 
-Se tiver interesse, posso explicar melhor! 💬
+Saiba mais sobre as vantagens no site oficial da Ton: https://bit.ly/3Ygot8q.
+Fique à vontade para me chamar se quiser conversar! 💬
 Se não quiser receber mensagens, só avisar, ok?`
 
 export const messageVariants = [
