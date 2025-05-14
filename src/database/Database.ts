@@ -37,7 +37,8 @@ export class Database {
         error_message TEXT,
         retry_count INTEGER DEFAULT 0,
         campaign TEXT,
-        csv_filename TEXT
+        csv_filename TEXT,
+        name TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_phone_status 

@@ -3,8 +3,9 @@ import { client } from './config/whatsapp';
 import { counters, LIMITS } from './constants';
 import { PhoneNumberRepository } from './database/PhoneNumberRepository';
 import env from './env';
+import { ContactToProcess } from './interfaces';
 import { loadContactsFromCSV } from './load-contacts-from-csv';
-import { messageVariants } from './messages';
+import { mensagemVariants } from './messages';
 import { delay, formatPhoneNumber, maskPhoneNumber } from './utils';
 import { Logger } from './utils/logger';
 
@@ -90,26 +91,50 @@ async function handleMessageLimits(): Promise<void> {
 }
 
 // Processamento de lote de mensagens
-async function processBatch(numbers: string[], startIndex: number, batchNumber: number, totalBatches: number): Promise<void> {
-  const endIndex = Math.min(startIndex + LIMITS.BATCH_SIZE, numbers.length);
-  const batch = numbers.slice(startIndex, endIndex);
+async function processBatch(contacts: ContactToProcess[], startIndex: number, batchNumber: number, totalBatches: number): Promise<void> {
+  const endIndex = Math.min(startIndex + LIMITS.BATCH_SIZE, contacts.length);
+  const batch = contacts.slice(startIndex, endIndex);
 
-  for (const [index, number] of batch.entries()) {
+  for (const [index, contact] of batch.entries()) {
     const globalIndex = startIndex + index;
+    const number = contact.number;
+    const name = contact.name || "";
     
     Logger.separator();
-    Logger.status(`PROCESSANDO MENSAGEM ${globalIndex + 1}/${numbers.length}`);
-    Logger.progress(globalIndex + 1, numbers.length, 'Progresso');
+    Logger.status(`PROCESSANDO MENSAGEM ${globalIndex + 1}/${contacts.length}`);
+    Logger.progress(globalIndex + 1, contacts.length, 'Progresso');
     Logger.info(`Número: ${maskPhoneNumber(formatPhoneNumber(number))}`);
+    if (name) Logger.info(`Nome: ${name}`);
     Logger.info(`Lote atual: ${batchNumber}/${totalBatches}`);
 
     try {
       await handleMessageLimits();
       
-      Logger.sameLine('📤 Enviando mensagem... ');
-      const randomMessage = messageVariants[Math.floor(Math.random() * messageVariants.length)];
-      await client.sendMessage(`${number}@c.us`, randomMessage);
-      Logger.success('Mensagem enviada com sucesso!');
+      // Selecionar mensagem aleatória
+      const randomVariant = mensagemVariants[Math.floor(Math.random() * mensagemVariants.length)];
+      
+      // Preparar a mensagem principal com o nome
+      let mensagemPrincipal = randomVariant.mensagem;
+      
+      // Se o nome estiver vazio, remove o [NAME] e qualquer espaço seguido de exclamação
+      if (!name.trim()) {
+        mensagemPrincipal = mensagemPrincipal.replace(/\s\[NAME\]/g, "");
+      } else {
+        mensagemPrincipal = mensagemPrincipal.replace(/\[NAME\]/g, name.trim());
+      }
+      
+      // Enviar mensagem principal
+      Logger.sameLine('📤 Enviando mensagem principal... ');
+      await client.sendMessage(`${number}@c.us`, mensagemPrincipal);
+      Logger.success('Mensagem principal enviada com sucesso!');
+      
+      // Breve pausa para separar as mensagens
+      await delay(1000);
+      
+      // Enviar rodapé com link
+      Logger.sameLine('📤 Enviando rodapé com link... ');
+      await client.sendMessage(`${number}@c.us`, randomVariant.rodape);
+      Logger.success('Rodapé enviado com sucesso!');
       
       await phoneNumberRepository.markMessageAsSent(number, 'whatsapp-campaign');
       
@@ -121,12 +146,10 @@ async function processBatch(numbers: string[], startIndex: number, batchNumber: 
         'Mensagens hoje': `${counters.daily}/${LIMITS.DAILY}`
       });
 
-      if (index < batch.length - 1) {
-        const interval = env.limits.messageInterval;
-        
-        Logger.wait(`Aguardando ${interval/1000}s antes do próximo envio...`);
-        await delay(interval);
-      }
+      // Adicionar pausa após cada mensagem, inclusive a última
+      const interval = env.limits.messageInterval;
+      Logger.wait(`Aguardando ${interval/1000}s antes do próximo envio...`);
+      await delay(interval);
     } catch (error) {
       Logger.error('ERRO NO ENVIO');
       Logger.error(`Número: ${maskPhoneNumber(formatPhoneNumber(number))}`);
@@ -134,20 +157,19 @@ async function processBatch(numbers: string[], startIndex: number, batchNumber: 
       
       await phoneNumberRepository.markMessageAsFailed(number, error instanceof Error ? error.message : String(error));
       
-      if (index < batch.length - 1) {
-        Logger.wait('Aguardando 30 segundos antes de tentar o próximo número...');
-        await delay(LIMITS.ERROR_RETRY_DELAY);
-      }
+      // Pausa após erro, mesmo se for o último contato
+      Logger.wait('Aguardando 30 segundos devido a erro...');
+      await delay(LIMITS.ERROR_RETRY_DELAY);
     }
   }
 
-  // Pausa entre lotes
-  if (endIndex < numbers.length) {
+  // Pausa entre lotes (apenas se não for o último lote)
+  if (endIndex < contacts.length) {
     Logger.section(`PAUSA PROGRAMADA - LOTE ${batchNumber} FINALIZADO`);
     
     Logger.summary('Status do Envio', {
-      'Mensagens enviadas': `${endIndex}/${numbers.length}`,
-      'Progresso': `${((endIndex/numbers.length)*100).toFixed(1)}%`,
+      'Mensagens enviadas': `${endIndex}/${contacts.length}`,
+      'Progresso': `${((endIndex/contacts.length)*100).toFixed(1)}%`,
       'Lotes processados': `${batchNumber}/${totalBatches}`
     });
     
@@ -158,28 +180,28 @@ async function processBatch(numbers: string[], startIndex: number, batchNumber: 
 }
 
 // Processamento principal de envio em massa
-async function sendBulkMessages(numbersToProcess: string[]): Promise<void> {
+async function sendBulkMessages(contactsToProcess: ContactToProcess[]): Promise<void> {
   Logger.section('INICIANDO ENVIO EM MASSA');
   
   Logger.summary('Resumo da Configuração', {
-    'Total de contatos': numbersToProcess.length,
+    'Total de contatos': contactsToProcess.length,
     'Limite por hora': LIMITS.HOURLY,
     'Limite diário': LIMITS.DAILY,
     'Intervalo entre envios': `${LIMITS.MIN_SECONDS}-${LIMITS.MAX_SECONDS}s (aleatório)`,
     'Pausa a cada 50 mensagens': '1 minuto'
   });
 
-  const totalBatches = Math.ceil(numbersToProcess.length / LIMITS.BATCH_SIZE);
+  const totalBatches = Math.ceil(contactsToProcess.length / LIMITS.BATCH_SIZE);
   
-  for (let i = 0; i < numbersToProcess.length; i += LIMITS.BATCH_SIZE) {
+  for (let i = 0; i < contactsToProcess.length; i += LIMITS.BATCH_SIZE) {
     const batchNumber = Math.floor(i / LIMITS.BATCH_SIZE) + 1;
-    await processBatch(numbersToProcess, i, batchNumber, totalBatches);
+    await processBatch(contactsToProcess, i, batchNumber, totalBatches);
   }
   
   Logger.section('PROCESSO FINALIZADO');
   
   Logger.summary('Resumo Final', {
-    'Total de mensagens processadas': numbersToProcess.length,
+    'Total de mensagens processadas': contactsToProcess.length,
     'Data de conclusão': new Date().toLocaleString(),
     'Status': 'Processo finalizado com sucesso!'
   });
@@ -206,10 +228,12 @@ async function handleClientReady(): Promise<void> {
 
     // 2. Inserir todos os contatos no banco em lotes
     const BATCH_SIZE = 100;
+
     for (let i = 0; i < allContacts.length; i += BATCH_SIZE) {
       await phoneNumberRepository.addOrUpdatePhonesBulk(
-        allContacts.slice(i, i + BATCH_SIZE).map(number => ({
-          phoneNumber: number,
+        allContacts.slice(i, i + BATCH_SIZE).map(contact => ({
+          phoneNumber: contact.number,
+          name: contact.name,
           csvFilename: 'data'
         }))
       );
@@ -219,9 +243,9 @@ async function handleClientReady(): Promise<void> {
     for (let i = 0; i < allContacts.length; i += BATCH_SIZE) {
       const batch = allContacts.slice(i, i + BATCH_SIZE);
       const whatsappChecks = await Promise.all(
-        batch.map(async (number) => {
-          const isRegistered = await client.isRegisteredUser(`${number}@c.us`);
-          return { phoneNumber: number, isRegistered };
+        batch.map(async (contact) => {
+          const isRegistered = await client.isRegisteredUser(`${contact.number}@c.us`);
+          return { phoneNumber: contact.number, isRegistered };
         })
       );
       await phoneNumberRepository.updateWhatsAppStatusBulk(whatsappChecks);
@@ -232,10 +256,13 @@ async function handleClientReady(): Promise<void> {
     Logger.status(`Total de números pendentes: ${numbersPending.length}`);
 
     // 5. Processar os números pendentes
-    const numbersToProcess = numbersPending.map(phone => phone.phone_number);
-    Logger.status(`Total de números válidos: ${numbersToProcess.length}`);
+    const contactsToProcess: ContactToProcess[] = numbersPending.map(phone => ({
+      number: phone.phone_number,
+      name: phone.name
+    }));
+    Logger.status(`Total de números válidos: ${contactsToProcess.length}`);
 
-    if (numbersToProcess.length === 0) {
+    if (contactsToProcess.length === 0) {
       const stats = await phoneNumberRepository.getStats();
       Logger.summary('Estatísticas', stats);
       Logger.error('Nenhum número registrado no WhatsApp e pendente de envio encontrado no banco de dados.');
@@ -243,14 +270,14 @@ async function handleClientReady(): Promise<void> {
     }
 
     Logger.section('PREPARANDO ENVIO DE MENSAGENS');
-    Logger.status(`Total de números pendentes de envio: ${numbersToProcess.length}`);
+    Logger.status(`Total de números pendentes de envio: ${contactsToProcess.length}`);
     Logger.status(`Limite por hora: ${LIMITS.HOURLY}`);
     Logger.status(`Intervalo entre envios: ${LIMITS.MIN_SECONDS}-${LIMITS.MAX_SECONDS}s (aleatório)`);
     Logger.wait('Aguardando 5 segundos antes de iniciar...');
     await delay(5000);
 
     // 6. Enviar as mensagens em massa
-    await sendBulkMessages(numbersToProcess);
+    await sendBulkMessages(contactsToProcess);
   } catch (error) {
     Logger.error('Erro ao carregar contatos', error instanceof Error ? error : String(error));
     process.exit(1);

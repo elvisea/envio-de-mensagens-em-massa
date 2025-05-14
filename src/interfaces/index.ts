@@ -30,15 +30,22 @@ export interface PhoneNumber {
   retry_count: number;
   campaign?: string;
   csv_filename: string;
+  name: string;
 }
 
 export interface BulkPhoneInsert {
   phoneNumber: string;
   csvFilename: string;
+  name: string;
 }
 
 export interface WhatsAppStatus {
   phoneNumber: string;
   isRegistered: boolean;
+}
+
+export interface ContactToProcess {
+  number: string;
+  name?: string;
 }
 

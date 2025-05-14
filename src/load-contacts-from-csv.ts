@@ -71,9 +71,9 @@ async function processBatch(
 
 /**
  * Carrega e processa contatos do arquivo CSV
- * Retorna uma lista de números válidos
+ * Retorna uma lista de objetos { number, name }
  */
-export async function loadContactsFromCSV(filename: string = 'data.csv'): Promise<string[]> {
+export async function loadContactsFromCSV(filename: string = 'data.csv'): Promise<{ number: string, name: string }[]> {
   const startTime = Date.now();
   
   try {
@@ -102,6 +102,7 @@ export async function loadContactsFromCSV(filename: string = 'data.csv'): Promis
     Logger.info(`Total de registros encontrados: ${records.length}`);
 
     const validNumbers = new Set<string>();
+    const contacts: { number: string, name: string }[] = [];
 
     // Divide os registros em lotes
     const batches: CSVRow[][] = [];
@@ -115,10 +116,26 @@ export async function loadContactsFromCSV(filename: string = 'data.csv'): Promis
     for (const [index, batch] of batches.entries()) {
       Logger.separator();
       Logger.info(`Processando lote ${index + 1}/${batches.length}...`);
-      await processBatch(batch, validNumbers, stats, index, batches.length);
+      for (const row of batch) {
+        const name = row.nome_socio?.trim() || row.nome_representante?.trim() || '';
+        const number1 = processPhoneNumber(row.ddd1, row.telefone1);
+        if (number1 && !validNumbers.has(number1)) {
+          validNumbers.add(number1);
+          contacts.push({ number: number1, name });
+          stats.valid++;
+        } else if (row.ddd1 && row.telefone1) {
+          stats.invalid++;
+        }
+        const number2 = processPhoneNumber(row.ddd2, row.telefone2);
+        if (number2 && !validNumbers.has(number2)) {
+          validNumbers.add(number2);
+          contacts.push({ number: number2, name });
+          stats.valid++;
+        } else if (row.ddd2 && row.telefone2) {
+          stats.invalid++;
+        }
+      }
     }
-
-    const numbersToProcess = Array.from(validNumbers);
 
     // Log do resumo final
     Logger.separator();
@@ -136,7 +153,7 @@ export async function loadContactsFromCSV(filename: string = 'data.csv'): Promis
       'Média por lote': `${(stats.total / batches.length / (BATCH_SIZE / 1000)).toFixed(2)} registros/segundo`
     });
 
-    return numbersToProcess;
+    return contacts;
 
   } catch (error) {
     Logger.error('Erro ao processar arquivo CSV');

@@ -93,61 +93,115 @@ Se preferir, também estou à disposição para te ajudar no que precisar! 💬
 
 Caso não queira receber mensagens, é só me avisar. 😉`
 
-export const newMessage = `Olá, tudo bem? 😊
-Me chamo Ana Luiza e sou consultora oficial da Ton. Vi que sua empresa foi criada recentemente e acredito que posso te ajudar a vender com mais facilidade e economia.
+// Estrutura de mensagens separadas em mensagem principal e rodapé
+export interface MensagemVariante {
+  mensagem: string;
+  rodape: string;
+}
 
-Trabalho com maquininhas com:
-✅ Taxas a partir de 0,74%
-✅ Zero mensalidade — a maquininha é sua
-✅ Recebimento rápido, em até 1 dia útil
-✅ Suporte confiável e dedicado
+// Lista padrão de benefícios para usar em todas as mensagens - abordagem mais consultiva
+const BENEFICIOS_PADRAO = `• Otimize suas vendas com taxas a partir de 0,74%
+• Sem custos mensais recorrentes
+• Pagamentos disponíveis em até 1 dia útil
+• Assistência personalizada sempre que precisar`;
 
-Todas as informações completas estão disponíveis no site oficial da Ton: https://bit.ly/3Ygot8q.
-Se preferir, também estou à disposição para te ajudar no que precisar! 💬
-Caso não queira receber mensagens, é só me avisar, tudo bem?`
+// Apresentação padrão mais consultiva
+const APRESENTACAO_PADRAO = `Sou Ana Luiza, consultora oficial da Ton. Estou aqui para ajudar empreendedores como você:`;
 
-export const newMessageVariant1 = `Oi, tudo certo? 😊
-Sou Ana Luiza, consultora oficial da Ton. Notei que sua empresa foi criada recentemente e acredito que posso ajudar você a vender de forma mais simples e econômica.
+// Rodapé padrão mais sutil, sem link direto e com referência ao catálogo
+const RODAPE_PADRAO = `Temos um catálogo completo disponível em meu perfil para você consultar quando desejar.
+Estou à disposição se precisar de ajuda! 💬
+Se preferir não receber outras mensagens, é só avisar.`;
 
-Ofereço maquininhas com:
-✅ Taxas a partir de 0,74%
-✅ Sem mensalidade — a maquininha é sua
-✅ Recebimento em até 1 dia útil
-✅ Suporte dedicado e confiável
+// Variantes de mensagem TON - abordagem mais consultiva
+export const varianteMensagem0: MensagemVariante = {
+  mensagem: `Vi que sua empresa está começando [NAME]! 
+Parabéns por esse passo importante. O mercado está repleto de oportunidades para negócios inovadores.
 
-Para mais detalhes, acesse o site oficial da Ton: https://bit.ly/3Ygot8q.
-Qualquer dúvida, é só me chamar por aqui! 💬
-Se preferir não receber mensagens, é só avisar, combinado?`
+${APRESENTACAO_PADRAO}
 
-export const newMessageVariant2 = `Olá! 👋 Me chamo Ana Luiza e sou consultora da Ton.
-Vi que você abriu sua empresa recentemente e gostaria de apresentar uma solução para facilitar suas vendas e economizar no dia a dia.
+${BENEFICIOS_PADRAO}`,
 
-Nossas maquininhas oferecem:
-✅ Taxas reduzidas a partir de 0,74%
-✅ Zero mensalidade — a máquina é sua
-✅ Pagamento rápido, em até 1 dia útil
-✅ Atendimento ágil e confiável
+  rodape: RODAPE_PADRAO
+};
 
-Confira todas as condições e informações no site oficial da Ton: https://bit.ly/3Ygot8q.
-Se precisar de ajuda, estou à disposição! 💬
-Caso não queira receber mais mensagens, é só me avisar. 😉`
+export const varianteMensagem1: MensagemVariante = {
+  mensagem: `Notei que você iniciou um novo empreendimento [NAME].
+É inspirador ver novos negócios surgindo mesmo em tempos desafiadores.
 
-export const newMessageVariant3 = `Oi, tudo bem? 😊
-Aqui é a Ana Luiza, consultora oficial da Ton. Percebi que sua empresa foi criada há pouco tempo e quero te mostrar como é fácil vender com nossas maquininhas.
+${APRESENTACAO_PADRAO}
 
-Veja as vantagens:
-✅ Taxas a partir de 0,74%
-✅ Sem mensalidade — a maquininha é sua
-✅ Receba em até 1 dia útil
-✅ Suporte sempre disponível
+${BENEFICIOS_PADRAO}`,
 
-Saiba mais sobre as vantagens no site oficial da Ton: https://bit.ly/3Ygot8q.
-Fique à vontade para me chamar se quiser conversar! 💬
-Se não quiser receber mensagens, só avisar, ok?`
+  rodape: RODAPE_PADRAO
+};
+
+export const varianteMensagem2: MensagemVariante = {
+  mensagem: `Gostaria de parabenizar pelo seu novo negócio [NAME].
+Empreendedores como você impulsionam a economia e trazem inovação ao mercado.
+
+${APRESENTACAO_PADRAO}
+
+${BENEFICIOS_PADRAO}`,
+
+  rodape: RODAPE_PADRAO
+};
+
+export const varianteMensagem3: MensagemVariante = {
+  mensagem: `Percebi que você começou uma nova jornada empresarial [NAME].
+Os primeiros passos de um negócio são fundamentais para seu desenvolvimento futuro.
+
+${APRESENTACAO_PADRAO}
+
+${BENEFICIOS_PADRAO}`,
+
+  rodape: RODAPE_PADRAO
+};
+
+export const varianteMensagem4: MensagemVariante = {
+  mensagem: `Observei que você entrou para o mundo dos negócios recentemente [NAME].
+Cada novo empreendimento traz possibilidades empolgantes e desafios únicos.
+
+${APRESENTACAO_PADRAO}
+
+${BENEFICIOS_PADRAO}`,
+
+  rodape: RODAPE_PADRAO
+};
+
+export const varianteMensagem5: MensagemVariante = {
+  mensagem: `Soube do seu novo empreendimento [NAME] e gostaria de conectar.
+O momento inicial de um negócio é crucial para estabelecer bases sólidas.
+
+${APRESENTACAO_PADRAO}
+
+${BENEFICIOS_PADRAO}`,
+
+  rodape: RODAPE_PADRAO
+};
+
+export const mensagemVariants = [
+  varianteMensagem0,
+  varianteMensagem1,
+  varianteMensagem2,
+  varianteMensagem3,
+  varianteMensagem4,
+  varianteMensagem5,
+];
+
+// Mantendo as variáveis antigas para compatibilidade (pode ser removido depois)
+export const newMessageVariant0 = `${varianteMensagem0.mensagem}\n\n${varianteMensagem0.rodape}`;
+export const newMessageVariant1 = `${varianteMensagem1.mensagem}\n\n${varianteMensagem1.rodape}`;
+export const newMessageVariant2 = `${varianteMensagem2.mensagem}\n\n${varianteMensagem2.rodape}`;
+export const newMessageVariant3 = `${varianteMensagem3.mensagem}\n\n${varianteMensagem3.rodape}`;
+export const newMessageVariant4 = `${varianteMensagem4.mensagem}\n\n${varianteMensagem4.rodape}`;
+export const newMessageVariant5 = `${varianteMensagem5.mensagem}\n\n${varianteMensagem5.rodape}`;
 
 export const messageVariants = [
-  newMessage,
+  newMessageVariant0,
   newMessageVariant1,
   newMessageVariant2,
   newMessageVariant3,
+  newMessageVariant4,
+  newMessageVariant5,
 ];

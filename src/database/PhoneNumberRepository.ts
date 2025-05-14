@@ -14,7 +14,7 @@ export class PhoneNumberRepository {
   /**
    * Adiciona ou atualiza um número de telefone no banco
    */
-  async addOrUpdatePhone(phoneNumber: string, csvFilename: string) {
+  async addOrUpdatePhone(phoneNumber: string, csvFilename: string, name: string) {
     const now = new Date().toISOString();
     
     await this.db.run(
@@ -23,12 +23,14 @@ export class PhoneNumberRepository {
         status,
         csv_filename, 
         first_seen_at, 
-        last_updated_at
-      ) VALUES (?, 'pending', ?, ?, ?)
+        last_updated_at,
+        name
+      ) VALUES (?, 'pending', ?, ?, ?, ?)
       ON CONFLICT(phone_number) DO UPDATE SET
         last_updated_at = ?,
-        csv_filename = ?`,
-      [phoneNumber, csvFilename, now, now, now, csvFilename]
+        csv_filename = ?,
+        name = ?`,
+      [phoneNumber, csvFilename, now, now, name, now, csvFilename, name]
     );
   }
 
@@ -47,15 +49,17 @@ export class PhoneNumberRepository {
           status,
           csv_filename, 
           first_seen_at, 
-          last_updated_at
-        ) VALUES (?, 'pending', ?, ?, ?)
+          last_updated_at,
+          name
+        ) VALUES (?, 'pending', ?, ?, ?, ?)
         ON CONFLICT(phone_number) DO UPDATE SET
           last_updated_at = ?,
-          csv_filename = ?
+          csv_filename = ?,
+          name = ?
       `);
 
-      for (const { phoneNumber, csvFilename } of phones) {
-        await stmt.run([phoneNumber, csvFilename, now, now, now, csvFilename]);
+      for (const { phoneNumber, csvFilename, name } of phones) {
+        await stmt.run([phoneNumber, csvFilename, now, now, name, now, csvFilename, name]);
       }
 
       await stmt.finalize();
@@ -146,7 +150,7 @@ export class PhoneNumberRepository {
       SELECT * FROM phone_numbers 
       WHERE status = 'pending' 
       AND is_whatsapp_registered = true
-      ORDER BY first_seen_at ASC
+      ORDER BY first_seen_at DESC
     `);
     return numbers || [];
   }
